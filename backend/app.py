@@ -26,9 +26,26 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
 
 # Configure CORS to allow frontend access
+allowed_origins = [
+    "http://localhost:5173", 
+    "http://localhost:3000", 
+    "http://127.0.0.1:5173"
+]
+
+# Add production frontend URL from environment variable
+frontend_url = os.getenv('FRONTEND_URL')
+if frontend_url:
+    allowed_origins.append(frontend_url)
+    # Also add https version if http is provided
+    if frontend_url.startswith('http://'):
+        allowed_origins.append(frontend_url.replace('http://', 'https://'))
+    # Also add http version if https is provided
+    elif frontend_url.startswith('https://'):
+        allowed_origins.append(frontend_url.replace('https://', 'http://'))
+
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"],
+        "origins": allowed_origins,
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True
