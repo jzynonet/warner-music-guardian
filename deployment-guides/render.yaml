@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: ugc-monitor-backend
+    env: python
+    region: oregon
+    buildCommand: "cd backend && pip install -r requirements.txt"
+    startCommand: "cd backend && python app.py"
+    envVars:
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_PATH
+        value: /opt/render/project/src/videos.db
+      - key: PORT
+        value: 5000
+    disk:
+      name: database
+      mountPath: /opt/render/project/src
+      sizeGB: 1
