@@ -6,13 +6,15 @@ function ArtistManager({ onArtistChange }) {
   const [artists, setArtists] = useState([])
   const [selectedArtist, setSelectedArtist] = useState(null)
   const [showForm, setShowForm] = useState(false)
-  const [showSpotifyImport, setShowSpotifyImport] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [loading, setLoading] = useState(false)
   const [spotifyUrl, setSpotifyUrl] = useState('')
+  const [artistNameSearch, setArtistNameSearch] = useState('')
   const [importing, setImporting] = useState(false)
   const [importProgress, setImportProgress] = useState(null)
   const [showSongSelection, setShowSongSelection] = useState(false)
   const [previewData, setPreviewData] = useState(null)
+  const [importMode, setImportMode] = useState('name') // 'name' or 'url'
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -100,17 +102,32 @@ function ArtistManager({ onArtistChange }) {
     }
   }
 
-  const handleSpotifyPreview = async (e) => {
+  const handleImportPreview = async (e) => {
     e.preventDefault()
-    if (!spotifyUrl.trim()) return
+    
+    const searchValue = importMode === 'url' ? spotifyUrl.trim() : artistNameSearch.trim()
+    if (!searchValue) return
 
     setImporting(true)
-    setImportProgress('Fetching songs from Spotify...')
+    setImportProgress(importMode === 'url' 
+      ? 'Looking up artist (trying Spotify → MusicBrainz fallback)...' 
+      : 'Searching for artist songs (Spotify + MusicBrainz)...'
+    )
     
     try {
-      const response = await axios.post('/api/songs/preview-from-spotify', { 
-        spotify_url: spotifyUrl.trim()
-      })
+      let response
+      
+      if (importMode === 'url') {
+        // Use Spotify URL with fallback
+        response = await axios.post('/api/songs/preview-from-spotify', { 
+          spotify_url: searchValue
+        })
+      } else {
+        // Search by artist name
+        response = await axios.post('/api/songs/search-artist', { 
+          artist_name: searchValue
+        })
+      }
       
       setImportProgress(null)
       setPreviewData(response.data)
@@ -118,8 +135,17 @@ function ArtistManager({ onArtistChange }) {
       
     } catch (error) {
       setImportProgress(null)
-      const errorMsg = error.response?.data?.error || 'Failed to fetch from Spotify'
-      alert(`❌ Failed to fetch songs:\n\n${errorMsg}`)
+      const errorData = error.response?.data
+      const errorMsg = errorData?.error || 'Failed to fetch songs'
+      const sourcesTried = errorData?.sources_tried || []
+      
+      let detailedMsg = `❌ Failed to find songs:\n\n${errorMsg}`
+      if (sourcesTried.length > 0) {
+        detailedMsg += `\n\nSources tried: ${sourcesTried.join(', ')}`
+      }
+      detailedMsg += '\n\nTip: Try searching by artist name instead of URL, or check the spelling.'
+      
+      alert(detailedMsg)
     } finally {
       setImporting(false)
     }
@@ -137,15 +163,18 @@ function ArtistManager({ onArtistChange }) {
       const { artist, songs_added, songs_skipped } = response.data
       
       setShowSongSelection(false)
-      setShowSpotifyImport(false)
+      setShowImport(false)
       setSpotifyUrl('')
+      setArtistNameSearch('')
       setPreviewData(null)
       
+      const source = previewData.source || 'music database'
       alert(
         `✅ Successfully imported!\n\n` +
         `Artist: ${artist.name}\n` +
         `Songs added: ${songs_added}\n` +
-        `Songs skipped: ${songs_skipped} (already in database)\n\n` +
+        `Songs skipped: ${songs_skipped} (already in database)\n` +
+        `Source: ${source}\n\n` +
         `Ready to search on YouTube!`
       )
       
@@ -172,21 +201,22 @@ function ArtistManager({ onArtistChange }) {
         <div className="flex gap-3">
           <button
             onClick={() => {
-              setShowSpotifyImport(!showSpotifyImport)
+              setShowImport(!showImport)
               setShowForm(false)
               setSpotifyUrl('')
+              setArtistNameSearch('')
             }}
             className="px-4 py-2 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 rounded-xl hover:bg-emerald-600/30 transition-all font-bold flex items-center gap-2 shadow-lg hover:shadow-emerald-500/20"
           >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
-            <span>{showSpotifyImport ? 'Cancel Import' : 'Import from Spotify'}</span>
+            <span>{showImport ? 'Cancel Import' : 'Import Artist & Songs'}</span>
           </button>
           <button
             onClick={() => {
               setShowForm(!showForm)
-              setShowSpotifyImport(false)
+              setShowImport(false)
               setSelectedArtist(null)
               setFormData({ name: '', email: '', contact_person: '', notes: '' })
             }}
@@ -204,35 +234,90 @@ function ArtistManager({ onArtistChange }) {
         mainSongs={previewData?.main_songs || []}
         featuredSongs={previewData?.featured_songs || []}
         onImport={handleImportSelectedSongs}
+        source={previewData?.source}
       />
 
-      {showSpotifyImport && (
-        <form onSubmit={handleSpotifyPreview} className="mb-8 p-6 bg-emerald-900/10 rounded-2xl border border-emerald-500/20 backdrop-blur-sm relative z-10">
-          <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-            <svg className="w-6 h-6 text-emerald-500" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+      {showImport && (
+        <form onSubmit={handleImportPreview} className="mb-8 p-6 bg-emerald-900/10 rounded-2xl border border-emerald-500/20 backdrop-blur-sm relative z-10">
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <svg className="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <span>Import Artist from Spotify</span>
+            <span>Import Artist & Songs</span>
           </h3>
+
+          {/* Import Mode Toggle */}
+          <div className="flex gap-2 mb-6">
+            <button
+              type="button"
+              onClick={() => setImportMode('name')}
+              className={`flex-1 px-4 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                importMode === 'name'
+                  ? 'bg-emerald-600/30 text-emerald-300 border-2 border-emerald-500/50 shadow-lg shadow-emerald-500/10'
+                  : 'bg-white/5 text-slate-400 border-2 border-transparent hover:bg-white/10'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              Search by Name
+              <span className="text-[10px] px-2 py-0.5 bg-emerald-500/20 rounded-full text-emerald-400 border border-emerald-500/30">RECOMMENDED</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setImportMode('url')}
+              className={`flex-1 px-4 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                importMode === 'url'
+                  ? 'bg-emerald-600/30 text-emerald-300 border-2 border-emerald-500/50 shadow-lg shadow-emerald-500/10'
+                  : 'bg-white/5 text-slate-400 border-2 border-transparent hover:bg-white/10'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+              </svg>
+              Spotify URL
+            </button>
+          </div>
           
           <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">
-                Paste Spotify Artist Link
-              </label>
-              <input
-                type="text"
-                value={spotifyUrl}
-                onChange={(e) => setSpotifyUrl(e.target.value)}
-                placeholder="https://open.spotify.com/artist/..."
-                className="w-full bg-black/30 border border-emerald-500/30 rounded-xl shadow-inner focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-white placeholder-slate-500 px-4 py-3 backdrop-blur-sm"
-                disabled={importing}
-                required
-              />
-              <p className="text-xs text-emerald-500/70 mt-2 font-medium">
-                💡 Open Spotify → Find artist → Click "..." → Share → Copy link to artist
-              </p>
-            </div>
+            {importMode === 'name' ? (
+              <div>
+                <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">
+                  Artist Name
+                </label>
+                <input
+                  type="text"
+                  value={artistNameSearch}
+                  onChange={(e) => setArtistNameSearch(e.target.value)}
+                  placeholder="e.g. Taylor Swift, Drake, Beyoncé..."
+                  className="w-full bg-black/30 border border-emerald-500/30 rounded-xl shadow-inner focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-white placeholder-slate-500 px-4 py-3 backdrop-blur-sm text-lg"
+                  disabled={importing}
+                  required
+                  autoFocus
+                />
+                <p className="text-xs text-emerald-500/70 mt-2 font-medium">
+                  🎵 Type the artist name and we'll fetch their songs from Spotify & MusicBrainz
+                </p>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">
+                  Spotify Artist Link
+                </label>
+                <input
+                  type="text"
+                  value={spotifyUrl}
+                  onChange={(e) => setSpotifyUrl(e.target.value)}
+                  placeholder="https://open.spotify.com/artist/..."
+                  className="w-full bg-black/30 border border-emerald-500/30 rounded-xl shadow-inner focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-white placeholder-slate-500 px-4 py-3 backdrop-blur-sm"
+                  disabled={importing}
+                  required
+                />
+                <p className="text-xs text-emerald-500/70 mt-2 font-medium">
+                  💡 Open Spotify → Find artist → Click "..." → Share → Copy link to artist
+                </p>
+              </div>
+            )}
 
             {importProgress && (
               <div className="flex items-center space-x-3 text-sm text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-4">
@@ -248,15 +333,21 @@ function ArtistManager({ onArtistChange }) {
               <svg className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-sm text-emerald-400/90">
-                This will automatically create the artist entry and import all their songs from Spotify
-              </p>
+              <div className="text-sm text-emerald-400/90">
+                <p className="font-bold mb-1">How it works:</p>
+                <ul className="space-y-1 text-xs text-emerald-400/70">
+                  <li>• Searches Spotify first for artist & songs</li>
+                  <li>• If Spotify can't find songs, automatically falls back to <strong>MusicBrainz</strong> (free database)</li>
+                  <li>• You'll preview & select which songs to import before anything is saved</li>
+                  <li>• Artist entry is automatically created in your database</li>
+                </ul>
+              </div>
             </div>
 
             <div className="flex gap-3">
               <button
                 type="submit"
-                disabled={importing || !spotifyUrl.trim()}
+                disabled={importing || (importMode === 'url' ? !spotifyUrl.trim() : !artistNameSearch.trim())}
                 className="px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 disabled:opacity-50 transition-all font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
               >
                 {importing ? (
@@ -265,20 +356,20 @@ function ArtistManager({ onArtistChange }) {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    <span>Importing...</span>
+                    <span>Searching...</span>
                   </>
                 ) : (
                   <>
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
-                    <span>Import Artist & Songs</span>
+                    <span>Find Artist & Songs</span>
                   </>
                 )}
               </button>
               <button
                 type="button"
-                onClick={() => setShowSpotifyImport(false)}
+                onClick={() => setShowImport(false)}
                 disabled={importing}
                 className="px-6 py-3 bg-white/5 text-slate-300 rounded-xl hover:bg-white/10 transition-colors disabled:opacity-50 font-bold border border-white/10"
               >

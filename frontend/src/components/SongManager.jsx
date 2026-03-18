@@ -2,46 +2,90 @@ import { useState } from 'react'
 import axios from 'axios'
 
 function SongManager({ songs, onChange }) {
+  const [importMode, setImportMode] = useState('name') // 'name' or 'url'
   const [spotifyUrl, setSpotifyUrl] = useState('')
+  const [artistNameSearch, setArtistNameSearch] = useState('')
   const [importing, setImporting] = useState(false)
   const [importProgress, setImportProgress] = useState(null)
   const [showManualAdd, setShowManualAdd] = useState(false)
   const [songName, setSongName] = useState('')
   const [artistName, setArtistName] = useState('')
 
-  const handleSpotifyImport = async (e) => {
+  const handleImport = async (e) => {
     e.preventDefault()
-    if (!spotifyUrl.trim()) return
+    
+    const searchValue = importMode === 'url' ? spotifyUrl.trim() : artistNameSearch.trim()
+    if (!searchValue) return
 
     setImporting(true)
-    setImportProgress('Fetching artist from Spotify...')
+    setImportProgress(
+      importMode === 'url'
+        ? 'Looking up artist (Spotify → MusicBrainz fallback)...'
+        : 'Searching for artist songs...'
+    )
     
     try {
-      const response = await axios.post('/api/songs/import-from-spotify', { 
-        spotify_url: spotifyUrl.trim(),
+      // Use the unified import endpoint that handles fallback
+      const payload = importMode === 'url'
+        ? { spotify_url: searchValue, auto_flag: false, priority: 'Medium' }
+        : { artist_name: searchValue, auto_flag: false, priority: 'Medium' }
+
+      // First preview to get songs
+      const previewEndpoint = importMode === 'url'
+        ? '/api/songs/preview-from-spotify'
+        : '/api/songs/search-artist'
+
+      const previewResponse = await axios.post(previewEndpoint, 
+        importMode === 'url' ? { spotify_url: searchValue } : { artist_name: searchValue }
+      )
+
+      const previewData = previewResponse.data
+      const allSongs = [...(previewData.main_songs || []), ...(previewData.featured_songs || [])]
+
+      if (allSongs.length === 0) {
+        setImportProgress(null)
+        alert('❌ No songs found for this artist.\n\nTry a different spelling or search method.')
+        return
+      }
+
+      setImportProgress(`Found ${allSongs.length} songs via ${previewData.source}. Importing...`)
+
+      // Now import all found songs
+      const response = await axios.post('/api/songs/import-from-spotify', {
+        artist_info: previewData.artist_info,
+        selected_songs: allSongs,
         auto_flag: false,
         priority: 'Medium'
       })
       
       setImportProgress(null)
       setSpotifyUrl('')
+      setArtistNameSearch('')
       
-      const { artist, songs_added, total_songs, albums } = response.data
+      const { artist, songs_added, songs_skipped } = response.data
       
       alert(
         `✅ Successfully imported!\n\n` +
         `Artist: ${artist.name}\n` +
         `Songs added: ${songs_added}\n` +
-        `Total songs: ${total_songs}\n` +
-        `Albums: ${albums}\n` +
+        `Songs skipped: ${songs_skipped} (duplicates)\n` +
+        `Source: ${previewData.source}\n` +
         `Followers: ${artist.followers?.toLocaleString() || 'N/A'}`
       )
       
       onChange()
     } catch (error) {
       setImportProgress(null)
-      const errorMsg = error.response?.data?.error || 'Failed to import from Spotify'
-      alert(`❌ Import failed:\n\n${errorMsg}`)
+      const errorData = error.response?.data
+      const errorMsg = errorData?.error || 'Failed to import'
+      const sourcesTried = errorData?.sources_tried || []
+      
+      let msg = `❌ Import failed:\n\n${errorMsg}`
+      if (sourcesTried.length > 0) {
+        msg += `\n\nSources tried: ${sourcesTried.join(', ')}`
+      }
+      msg += '\n\nTip: Try searching by artist name if URL doesn\'t work.'
+      alert(msg)
     } finally {
       setImporting(false)
     }
@@ -105,7 +149,7 @@ function SongManager({ songs, onChange }) {
     <div className="bg-gray-900 rounded-lg shadow-2xl p-6 border border-gray-800">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-white">
-          🎵 Add Artist from Spotify
+          🎵 Import Artist & Songs
         </h2>
         {songs.length > 0 && (
           <p className="text-xs text-gray-400 mt-1">
@@ -114,29 +158,77 @@ function SongManager({ songs, onChange }) {
         )}
       </div>
 
-      {/* Spotify Import Form (Primary) */}
-      <form onSubmit={handleSpotifyImport} className="mb-4">
+      {/* Import Mode Toggle */}
+      <div className="flex gap-2 mb-4">
+        <button
+          type="button"
+          onClick={() => setImportMode('name')}
+          className={`flex-1 px-3 py-2 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 ${
+            importMode === 'name'
+              ? 'bg-green-600/20 text-green-400 border border-green-500/40'
+              : 'bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700'
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          By Name
+          <span className="text-[9px] px-1.5 py-0.5 bg-green-500/20 rounded-full text-green-400 border border-green-500/30">BEST</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setImportMode('url')}
+          className={`flex-1 px-3 py-2 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 ${
+            importMode === 'url'
+              ? 'bg-green-600/20 text-green-400 border border-green-500/40'
+              : 'bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700'
+          }`}
+        >
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+          </svg>
+          Spotify URL
+        </button>
+      </div>
+
+      {/* Import Form */}
+      <form onSubmit={handleImport} className="mb-4">
         <div className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Paste Spotify Artist Link
+              {importMode === 'name' ? 'Artist Name' : 'Spotify Artist Link'}
             </label>
-            <input
-              type="text"
-              value={spotifyUrl}
-              onChange={(e) => setSpotifyUrl(e.target.value)}
-              placeholder="https://open.spotify.com/artist/..."
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm text-white placeholder-gray-500 px-3 py-2"
-              disabled={importing}
-            />
+            {importMode === 'name' ? (
+              <input
+                type="text"
+                value={artistNameSearch}
+                onChange={(e) => setArtistNameSearch(e.target.value)}
+                placeholder="e.g. Taylor Swift, Drake, Beyoncé..."
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm text-white placeholder-gray-500 px-3 py-2.5"
+                disabled={importing}
+                autoFocus
+              />
+            ) : (
+              <input
+                type="text"
+                value={spotifyUrl}
+                onChange={(e) => setSpotifyUrl(e.target.value)}
+                placeholder="https://open.spotify.com/artist/..."
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm text-white placeholder-gray-500 px-3 py-2.5"
+                disabled={importing}
+              />
+            )}
             <p className="text-xs text-gray-500 mt-1">
-              Get the link by clicking "Share" → "Copy link to artist" on Spotify
+              {importMode === 'name'
+                ? '🎵 We\'ll search Spotify & MusicBrainz for their complete discography'
+                : 'Get the link by clicking "Share" → "Copy link to artist" on Spotify'
+              }
             </p>
           </div>
           
           {importProgress && (
             <div className="flex items-center space-x-2 text-sm text-blue-400 bg-blue-900/20 border border-blue-800 rounded-lg p-3">
-              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin h-4 w-4 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
@@ -146,7 +238,7 @@ function SongManager({ songs, onChange }) {
 
           <button
             type="submit"
-            disabled={importing || !spotifyUrl.trim()}
+            disabled={importing || (importMode === 'url' ? !spotifyUrl.trim() : !artistNameSearch.trim())}
             className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 transition-colors font-medium flex items-center justify-center space-x-2"
           >
             {importing ? (
@@ -155,14 +247,14 @@ function SongManager({ songs, onChange }) {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <span>Importing from Spotify...</span>
+                <span>Importing...</span>
               </>
             ) : (
               <>
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                <span>Import All Songs from Spotify</span>
+                <span>Import All Songs</span>
               </>
             )}
           </button>

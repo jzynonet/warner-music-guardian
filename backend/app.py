@@ -18,6 +18,7 @@ from spotify_service import SpotifyService
 from musicbrainz_service import MusicBrainzService
 from keyword_learning import KeywordLearning
 from auto_update_service import AutoUpdateService
+from unified_import_service import UnifiedImportService
 
 # Load environment variables
 load_dotenv()
@@ -86,6 +87,12 @@ keyword_learner = KeywordLearning(db)
 
 # Initialize auto-update service
 auto_update_service = AutoUpdateService(db, spotify_service, musicbrainz_service)
+
+# Initialize unified import service (Spotify + MusicBrainz fallback)
+unified_import = UnifiedImportService(
+    spotify_service=spotify_service if SPOTIFY_CONFIGURED else None,
+    musicbrainz_service=musicbrainz_service
+)
 
 # Admin password
 ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123')
@@ -433,22 +440,35 @@ def bulk_import_songs():
 
 @app.route('/api/songs/preview-from-spotify', methods=['POST'])
 def preview_from_spotify():
-    """Preview artist songs from Spotify before importing"""
-    if not spotify_service or not SPOTIFY_CONFIGURED:
-        return jsonify({'error': 'Spotify API not configured. Please set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in .env'}), 500
-    
+    """Preview artist songs - tries Spotify first, falls back to MusicBrainz"""
     try:
         data = request.json
         spotify_url = data.get('spotify_url', '').strip()
+        artist_name = data.get('artist_name', '').strip()
         
-        if not spotify_url:
-            return jsonify({'error': 'Spotify URL is required'}), 400
+        if not spotify_url and not artist_name:
+            return jsonify({'error': 'Either a Spotify URL or artist name is required'}), 400
         
-        # Fetch artist and songs from Spotify
-        result = spotify_service.get_artist_all_songs_by_url(spotify_url)
+        # If we have a URL but no name, try to get name from URL first
+        if spotify_url and not artist_name and spotify_service and SPOTIFY_CONFIGURED:
+            try:
+                artist = spotify_service.get_artist_from_url(spotify_url)
+                if artist:
+                    artist_name = artist['name']
+            except:
+                pass
         
-        if 'error' in result:
-            return jsonify({'error': result['error']}), 400
+        # Use unified import service (Spotify + MusicBrainz fallback)
+        result = unified_import.get_artist_songs(
+            artist_name=artist_name,
+            spotify_url=spotify_url if spotify_url else None
+        )
+        
+        if not result['success']:
+            return jsonify({
+                'error': result.get('error', 'Could not find songs for this artist'),
+                'sources_tried': result.get('sources_tried', [])
+            }), 400
         
         return jsonify({
             'success': True,
@@ -457,7 +477,43 @@ def preview_from_spotify():
             'featured_songs': result['featured_songs'],
             'total_main_songs': result['total_main_songs'],
             'total_featured_songs': result['total_featured_songs'],
-            'albums': len(result['albums'])
+            'albums': len(result.get('albums', [])),
+            'source': result['source'],
+            'sources_tried': result['sources_tried']
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/songs/search-artist', methods=['POST'])
+def search_artist_for_import():
+    """Search for an artist by name to preview before importing"""
+    try:
+        data = request.json
+        artist_name = data.get('artist_name', '').strip()
+        
+        if not artist_name:
+            return jsonify({'error': 'Artist name is required'}), 400
+        
+        # Use unified import service
+        result = unified_import.get_artist_songs(artist_name=artist_name)
+        
+        if not result['success']:
+            return jsonify({
+                'error': result.get('error', 'Could not find songs for this artist'),
+                'sources_tried': result.get('sources_tried', [])
+            }), 400
+        
+        return jsonify({
+            'success': True,
+            'artist_info': result['artist_info'],
+            'main_songs': result['main_songs'],
+            'featured_songs': result['featured_songs'],
+            'total_main_songs': result['total_main_songs'],
+            'total_featured_songs': result['total_featured_songs'],
+            'albums': len(result.get('albums', [])),
+            'source': result['source'],
+            'sources_tried': result['sources_tried']
         })
         
     except Exception as e:
@@ -465,19 +521,48 @@ def preview_from_spotify():
 
 @app.route('/api/songs/import-from-spotify', methods=['POST'])
 def import_from_spotify():
-    """Import selected songs from Spotify artist"""
-    if not spotify_service or not SPOTIFY_CONFIGURED:
-        return jsonify({'error': 'Spotify API not configured. Please set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in .env'}), 500
-    
+    """Import selected songs from artist (works with both Spotify and MusicBrainz data)"""
     try:
         data = request.json
         artist_info = data.get('artist_info')
         selected_songs = data.get('selected_songs', [])
         auto_flag = data.get('auto_flag', False)
         priority = data.get('priority', 'Medium')
+        spotify_url = data.get('spotify_url', '').strip()
         
-        if not artist_info or not selected_songs:
-            return jsonify({'error': 'Artist info and selected songs are required'}), 400
+        # If called with spotify_url but no artist_info (from SongManager), 
+        # do the full lookup first
+        if spotify_url and not artist_info:
+            # Try to get artist name from URL
+            artist_name = ''
+            if spotify_service and SPOTIFY_CONFIGURED:
+                try:
+                    artist = spotify_service.get_artist_from_url(spotify_url)
+                    if artist:
+                        artist_name = artist['name']
+                except:
+                    pass
+            
+            # Full lookup with fallback
+            result = unified_import.get_artist_songs(
+                artist_name=artist_name,
+                spotify_url=spotify_url
+            )
+            
+            if not result['success']:
+                return jsonify({
+                    'error': result.get('error', 'Could not find songs'),
+                    'sources_tried': result.get('sources_tried', [])
+                }), 400
+            
+            artist_info = result['artist_info']
+            selected_songs = result['main_songs'] + result['featured_songs']
+        
+        if not artist_info:
+            return jsonify({'error': 'Artist info is required. Please provide a valid Spotify URL or artist name.'}), 400
+        
+        if not selected_songs:
+            return jsonify({'error': 'No songs found or selected for import'}), 400
         
         # Check if artist already exists in database
         existing_artist = None
@@ -491,9 +576,12 @@ def import_from_spotify():
         if existing_artist:
             artist_id = existing_artist.id
         else:
+            source_note = "Imported from Spotify" if artist_info.get('spotify_url') else "Imported from MusicBrainz"
+            followers = artist_info.get('followers', 0)
+            notes = f"{source_note}. Followers: {followers:,}" if followers else source_note
             artist_id = db.add_artist(
                 name=artist_info['name'],
-                notes=f"Imported from Spotify. Followers: {artist_info.get('followers', 0):,}"
+                notes=notes
             )
         
         # Add selected songs to database
@@ -501,21 +589,22 @@ def import_from_spotify():
         for song_data in selected_songs:
             # Handle both string and dict formats
             if isinstance(song_data, dict):
-                song_name = song_data['name']
+                song_name = song_data.get('name') or song_data.get('song_name', '')
                 duration_ms = song_data.get('duration_ms')
             else:
                 song_name = song_data
                 duration_ms = None
-                
-            songs_to_import.append({
-                'song_name': song_name,
-                'artist_name': artist_info['name'],
-                'active': True,
-                'artist_id': artist_id,
-                'auto_flag': auto_flag,
-                'priority': priority,
-                'duration_ms': duration_ms
-            })
+            
+            if song_name:  # Only add if we have a name
+                songs_to_import.append({
+                    'song_name': song_name,
+                    'artist_name': artist_info['name'],
+                    'active': True,
+                    'artist_id': artist_id,
+                    'auto_flag': auto_flag,
+                    'priority': priority,
+                    'duration_ms': duration_ms
+                })
         
         import_result = db.bulk_add_songs(songs_to_import)
         
