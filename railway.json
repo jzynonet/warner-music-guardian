@@ -10,10 +10,9 @@
     "restartPolicyMaxRetries": 10,
     "volumes": [
       {
-        "mountPath": "/app/backend",
+        "mountPath": "/data",
         "name": "backend-data"
       }
     ]
   }
 }
-
