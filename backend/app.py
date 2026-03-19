@@ -19,6 +19,7 @@ from musicbrainz_service import MusicBrainzService
 from keyword_learning import KeywordLearning
 from auto_update_service import AutoUpdateService
 from unified_import_service import UnifiedImportService
+from web_scraper_service import WebScraperService
 
 # Load environment variables
 load_dotenv()
@@ -82,16 +83,20 @@ except:
 # Initialize MusicBrainz service (always available, no auth needed)
 musicbrainz_service = MusicBrainzService()
 
+# Initialize web scraper service (Deezer + text parsing, always available)
+web_scraper_service = WebScraperService()
+
 # Initialize keyword learning
 keyword_learner = KeywordLearning(db)
 
 # Initialize auto-update service
 auto_update_service = AutoUpdateService(db, spotify_service, musicbrainz_service)
 
-# Initialize unified import service (Spotify + MusicBrainz fallback)
+# Initialize unified import service (Spotify + Deezer + MusicBrainz fallback)
 unified_import = UnifiedImportService(
     spotify_service=spotify_service if SPOTIFY_CONFIGURED else None,
-    musicbrainz_service=musicbrainz_service
+    musicbrainz_service=musicbrainz_service,
+    web_scraper_service=web_scraper_service
 )
 
 # Admin password
@@ -119,7 +124,8 @@ def health_check():
         'database_ok': os.path.exists(db.db_path),
         'email_configured': email_service.enabled,
         'spotify_configured': SPOTIFY_CONFIGURED,
-        'musicbrainz_available': True
+        'musicbrainz_available': True,
+        'deezer_available': True
     })
 
 @app.route('/api/auth/login', methods=['POST'])
@@ -514,6 +520,141 @@ def search_artist_for_import():
             'albums': len(result.get('albums', [])),
             'source': result['source'],
             'sources_tried': result['sources_tried']
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/songs/preview-deezer', methods=['POST'])
+def preview_from_deezer():
+    """Preview artist songs from Deezer (free, no auth - bypasses Spotify restrictions)"""
+    try:
+        data = request.json
+        artist_name = data.get('artist_name', '').strip()
+        
+        if not artist_name:
+            return jsonify({'error': 'Artist name is required'}), 400
+        
+        # Use Deezer directly via web scraper service
+        result = web_scraper_service.get_artist_songs_deezer(artist_name)
+        
+        if not result.get('success'):
+            return jsonify({
+                'error': result.get('error', 'Could not find songs on Deezer'),
+                'sources_tried': ['deezer']
+            }), 400
+        
+        return jsonify({
+            'success': True,
+            'artist_info': result['artist_info'],
+            'main_songs': result['main_songs'],
+            'featured_songs': result['featured_songs'],
+            'total_main_songs': result['total_main_songs'],
+            'total_featured_songs': result['total_featured_songs'],
+            'albums': len(result.get('albums', [])),
+            'source': 'deezer',
+            'sources_tried': ['deezer']
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/songs/parse-text', methods=['POST'])
+def parse_text_songs():
+    """Parse pasted text into song list for import (no API needed)"""
+    try:
+        data = request.json
+        text = data.get('text', '').strip()
+        artist_name = data.get('artist_name', '').strip()
+        
+        if not text:
+            return jsonify({'error': 'Text content is required'}), 400
+        if not artist_name:
+            return jsonify({'error': 'Artist name is required'}), 400
+        
+        result = web_scraper_service.parse_pasted_songs(text, artist_name)
+        
+        if not result.get('success') or len(result.get('songs', [])) == 0:
+            return jsonify({
+                'error': result.get('error', 'No songs could be parsed from the text'),
+                'sources_tried': ['text_paste']
+            }), 400
+        
+        # Format as main_songs for consistency with other endpoints
+        main_songs = [{
+            'name': s['name'],
+            'duration_ms': s.get('duration_ms'),
+            'release_date': s.get('release_date')
+        } for s in result['songs']]
+        
+        return jsonify({
+            'success': True,
+            'artist_info': {
+                'name': artist_name,
+                'followers': 0,
+                'genres': [],
+                'image_url': None
+            },
+            'main_songs': main_songs,
+            'featured_songs': [],
+            'total_main_songs': len(main_songs),
+            'total_featured_songs': 0,
+            'source': 'text_paste',
+            'sources_tried': ['text_paste']
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/songs/parse-csv-upload', methods=['POST'])
+def parse_csv_upload():
+    """Parse uploaded CSV file into song list for import (no API needed)"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        artist_name = request.form.get('artist_name', '').strip()
+        
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        if not file.filename.endswith('.csv'):
+            return jsonify({'error': 'Only CSV files are supported for this import'}), 400
+        
+        content = file.read().decode('utf-8')
+        result = web_scraper_service.parse_csv_songs(content, artist_name if artist_name else None)
+        
+        if not result.get('success') or len(result.get('songs', [])) == 0:
+            return jsonify({
+                'error': result.get('error', 'No songs could be parsed from the CSV file'),
+                'sources_tried': ['csv_upload']
+            }), 400
+        
+        # Determine the effective artist name
+        effective_artist = artist_name or (result['songs'][0].get('artist_name', 'Unknown Artist') if result['songs'] else 'Unknown Artist')
+        
+        # Format as main_songs for consistency
+        main_songs = [{
+            'name': s['name'],
+            'duration_ms': s.get('duration_ms'),
+            'release_date': s.get('release_date')
+        } for s in result['songs']]
+        
+        return jsonify({
+            'success': True,
+            'artist_info': {
+                'name': effective_artist,
+                'followers': 0,
+                'genres': [],
+                'image_url': None
+            },
+            'main_songs': main_songs,
+            'featured_songs': [],
+            'total_main_songs': len(main_songs),
+            'total_featured_songs': 0,
+            'source': 'csv_upload',
+            'sources_tried': ['csv_upload']
         })
         
     except Exception as e:

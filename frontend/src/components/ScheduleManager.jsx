@@ -26,7 +26,9 @@ function ScheduleManager({ apiConfigured }) {
       <div className="absolute top-0 right-0 w-32 h-32 bg-neon-green/5 rounded-full blur-3xl -mr-16 -mt-16"></div>
       <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-3 relative z-10">
         <div className="p-2 bg-neon-green/10 rounded-lg border border-neon-green/20 shadow-neon-green/20">
-            <span className="text-xl">⏰</span>
+            <svg className="w-5 h-5 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
         </div>
         <span className="tracking-wide">Auto-Schedule</span>
       </h2>

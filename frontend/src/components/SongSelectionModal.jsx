@@ -80,9 +80,6 @@ function SongSelectionModal({ isOpen, onClose, artistInfo, mainSongs, featuredSo
   const allMainSelected = mainSongs.every(s => isSongSelected(s))
   const allFeaturedSelected = featuredSongs.every(s => isSongSelected(s))
 
-  // Source badge
-  const sourceLabel = source === 'spotify' ? '🟢 Spotify' : source === 'musicbrainz' ? '🔵 MusicBrainz' : '🎵 Music Database'
-
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
       <div className="glass-card rounded-2xl shadow-2xl border border-white/10 max-w-4xl w-full max-h-[90vh] flex flex-col relative overflow-hidden">
@@ -90,13 +87,12 @@ function SongSelectionModal({ isOpen, onClose, artistInfo, mainSongs, featuredSo
         <div className="p-6 border-b border-white/10 bg-white/5 backdrop-blur-xl sticky top-0 z-20">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-3">
-                <span className="text-3xl">🎵</span> Select Songs to Import
+              <h2 className="text-xl font-semibold text-white mb-2">
+                Select Songs to Import
               </h2>
               <div className="space-y-1 pl-1">
                 <p className="text-slate-400 font-medium">
                   Artist: <span className="text-neon-blue font-bold">{artistInfo?.name}</span>
-                  <span className="ml-3 text-xs px-2 py-0.5 rounded-full bg-white/10 border border-white/10 text-slate-300">{sourceLabel}</span>
                 </p>
                 <p className="text-sm text-slate-500 font-medium">
                   {mainSongs.length} main songs • {featuredSongs.length} featured songs

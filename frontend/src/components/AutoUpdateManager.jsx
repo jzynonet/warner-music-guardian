@@ -71,9 +71,9 @@ function AutoUpdateManager({ apiConfigured }) {
       const result = response.data
       
       if (result.success) {
-        alert(`✅ Update Complete!\n\nArtist: ${result.artist}\nNew Songs Added: ${result.new_songs}\nTotal Songs: ${result.total_songs}\nSource: ${result.source}`)
+        alert(`Update Complete!\n\nArtist: ${result.artist}\nNew Songs Added: ${result.new_songs}\nTotal Songs: ${result.total_songs}\nSource: ${result.source}`)
       } else {
-        alert(`❌ Update Failed: ${result.error}`)
+        alert(`Update Failed: ${result.error}`)
       }
       
       await loadStatus()
@@ -94,8 +94,8 @@ function AutoUpdateManager({ apiConfigured }) {
       
       const summary = results.map(r => 
         r.success 
-          ? `✅ ${r.artist}: +${r.new_songs} songs` 
-          : `❌ ${r.artist || 'Unknown'}: ${r.error}`
+          ? `${r.artist}: +${r.new_songs} songs` 
+          : `${r.artist || 'Unknown'}: ${r.error}`
       ).join('\n')
       
       alert(`Batch Update Complete!\n\n${summary}`)
@@ -134,7 +134,9 @@ function AutoUpdateManager({ apiConfigured }) {
       <div className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-white/5 rounded-lg border border-white/10">
-             <span className="text-xl">🔄</span>
+             <svg className="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+             </svg>
           </div>
           <div>
              <h2 className="text-xl font-bold text-white leading-none">
@@ -184,7 +186,9 @@ function AutoUpdateManager({ apiConfigured }) {
       <div className="space-y-4">
         {artists.length === 0 ? (
            <div className="text-center py-12 border-2 border-dashed border-white/5 rounded-xl bg-white/[0.02]">
-             <div className="text-4xl mb-3 opacity-20">🔄</div>
+             <svg className="w-10 h-10 mx-auto mb-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
             <p className="text-slate-500 font-medium">
               No artists found. Add artists first to enable auto-updates.
             </p>
@@ -351,7 +355,7 @@ function AutoUpdateManager({ apiConfigured }) {
 
               <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                 <p className="text-sm text-slate-300">
-                  ℹ️ New songs will be automatically added as keywords ({config.frequency}) from {config.source}.
+                  New songs will be automatically added as keywords ({config.frequency}) from {config.source}.
                 </p>
               </div>
 

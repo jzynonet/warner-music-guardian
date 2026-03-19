@@ -109,16 +109,16 @@ function DashboardEnhanced({ apiConfigured }) {
       })
       
       const result = response.data
-      let message = `✅ Search complete!\n\n`
+      let message = `Search complete!\n\n`
       message += `Total found: ${result.total_found}\n`
       message += `New videos: ${result.total_new}\n\n`
       
       if (result.songs) {
         result.songs.forEach(s => {
           if (s.error) {
-            message += `❌ ${s.song_name} - ${s.artist_name}: ${s.error}\n`
+            message += `[Error] ${s.song_name} - ${s.artist_name}: ${s.error}\n`
           } else {
-            message += `✓ ${s.song_name} - ${s.artist_name}: ${s.found} found, ${s.new} new\n`
+            message += `${s.song_name} - ${s.artist_name}: ${s.found} found, ${s.new} new\n`
           }
         })
       }
@@ -170,7 +170,7 @@ function DashboardEnhanced({ apiConfigured }) {
   }
 
   const handleClearAllSongs = async () => {
-    const confirmMsg = `⚠️ DELETE ALL SONGS?\n\n` +
+    const confirmMsg = `DELETE ALL SONGS?\n\n` +
                       `This will delete all ${songs.length} song${songs.length !== 1 ? 's' : ''} from the database.\n\n` +
                       `Videos already found will remain.\n` +
                       `This action CANNOT be undone!\n\n` +
@@ -190,7 +190,7 @@ function DashboardEnhanced({ apiConfigured }) {
 
   const handleClearAll = async () => {
     const confirmed = await showConfirm(
-      `⚠️ WARNING: This will delete ALL ${stats?.total_videos || 0} videos from the database!\n\n` +
+      `WARNING: This will delete ALL ${stats?.total_videos || 0} videos from the database!\n\n` +
       'Your keywords, artists, and auto-flag rules will be kept.\n\n' +
       'This action cannot be undone.\n\n' +
       'Are you sure you want to continue?',
@@ -201,7 +201,7 @@ function DashboardEnhanced({ apiConfigured }) {
 
     // Second confirmation for safety
     const doubleCheck = await showConfirm(
-      '🛑 FINAL CONFIRMATION\n\n' +
+      'FINAL CONFIRMATION\n\n' +
       'This is your last chance to cancel.\n\n' +
       'Click OK to permanently delete all videos.',
       'danger'
@@ -291,18 +291,13 @@ function DashboardEnhanced({ apiConfigured }) {
             </div>
             
             
-            <div className="glass-panel p-6 rounded-xl border border-white/5">
+            <div className="glass-panel p-5 rounded-xl border border-white/5">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-white/5 rounded-lg">
-                    <span className="text-2xl">🎵</span>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">Artist Management</h3>
-                    <p className="text-sm text-slate-400">
-                      {artists.length} active artist{artists.length !== 1 ? 's' : ''} monitored
-                    </p>
-                  </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Artist Management</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {artists.length} active artist{artists.length !== 1 ? 's' : ''} monitored
+                  </p>
                 </div>
                 <button
                   onClick={() => setActiveTab('artists')}

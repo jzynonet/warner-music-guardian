@@ -58,7 +58,7 @@ function AutoFlagRules({ onRulesChange }) {
       const response = await axios.post('/api/auto-flag-rules', payload)
       console.log('Rule created:', response.data)
 
-      alert(`✅ Rule "${formData.name}" created successfully!`)
+      alert(`Rule "${formData.name}" created successfully!`)
 
       setShowForm(false)
       setFormData({
@@ -74,7 +74,7 @@ function AutoFlagRules({ onRulesChange }) {
     } catch (error) {
       console.error('Error creating rule:', error)
       const errorMsg = error.response?.data?.error || error.message || 'Failed to create rule'
-      alert(`❌ Error: ${errorMsg}\n\nCheck console for details. Backend may need restart.`)
+      alert(`Error: ${errorMsg}\n\nCheck console for details. Backend may need restart.`)
     } finally {
       setLoading(false)
     }
@@ -88,10 +88,10 @@ function AutoFlagRules({ onRulesChange }) {
       })
       await loadRules()
       if (onRulesChange) onRulesChange()
-      alert(`✅ Rule ${rule.active ? 'disabled' : 'enabled'}`)
+      alert(`Rule ${rule.active ? 'disabled' : 'enabled'}`)
     } catch (error) {
       console.error('Error toggling rule:', error)
-      alert(`❌ Failed to update rule: ${error.response?.data?.error || error.message}`)
+      alert(`Failed to update rule: ${error.response?.data?.error || error.message}`)
     }
   }
 
@@ -103,18 +103,18 @@ function AutoFlagRules({ onRulesChange }) {
       await axios.delete(`/api/auto-flag-rules/${ruleId}`)
       await loadRules()
       if (onRulesChange) onRulesChange()
-      alert('✅ Rule deleted successfully')
+      alert('Rule deleted successfully')
     } catch (error) {
       console.error('Error deleting rule:', error)
-      alert(`❌ Failed to delete rule: ${error.response?.data?.error || error.message}`)
+      alert(`Failed to delete rule: ${error.response?.data?.error || error.message}`)
     }
   }
 
   const getActionBadge = (action) => {
     const badges = {
-      'flag': { bg: 'bg-red-900', text: 'text-red-300', border: 'border-red-700', label: '🚩 Auto-Flag' },
-      'high_priority': { bg: 'bg-gray-800', text: 'text-gray-300', border: 'border-gray-700', label: '🟠 High Priority' },
-      'critical': { bg: 'bg-red-900', text: 'text-red-300', border: 'border-red-700', label: '🔴 Critical + Flag' }
+      'flag': { bg: 'bg-red-900', text: 'text-red-300', border: 'border-red-700', label: 'Auto-Flag' },
+      'high_priority': { bg: 'bg-gray-800', text: 'text-gray-300', border: 'border-gray-700', label: 'High Priority' },
+      'critical': { bg: 'bg-red-900', text: 'text-red-300', border: 'border-red-700', label: 'Critical + Flag' }
     }
     const badge = badges[action] || badges['flag']
     return (
@@ -146,7 +146,9 @@ function AutoFlagRules({ onRulesChange }) {
       {/* AI Auto-Detection Banner */}
       <div className="mb-6 bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
         <div className="flex items-start space-x-3">
-          <span className="text-2xl">🤖</span>
+          <svg className="w-6 h-6 text-blue-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
           <div className="flex-1">
             <h3 className="text-lg font-bold text-white mb-2">
               AI Smart Detection: Always Active
@@ -157,14 +159,14 @@ function AutoFlagRules({ onRulesChange }) {
             <div className="bg-black/30 border border-white/5 rounded-lg p-3">
               <p className="text-sm font-semibold text-white mb-2">Automatically Detects:</p>
               <div className="grid grid-cols-2 gap-2 text-xs text-slate-300">
-                <div>✓ Full album uploads</div>
-                <div>✓ Download links (MP3/FLAC)</div>
-                <div>✓ Bootleg recordings</div>
-                <div>✓ Pirate channels</div>
-                <div>✓ Leaked/unreleased content</div>
-                <div>✓ High quality rips (320kbps)</div>
-                <div>✓ Suspicious channel patterns</div>
-                <div>✓ Unofficial music archives</div>
+                <div>• Full album uploads</div>
+                <div>• Download links (MP3/FLAC)</div>
+                <div>• Bootleg recordings</div>
+                <div>• Pirate channels</div>
+                <div>• Leaked/unreleased content</div>
+                <div>• High quality rips (320kbps)</div>
+                <div>• Suspicious channel patterns</div>
+                <div>• Unofficial music archives</div>
               </div>
               <div className="mt-3 pt-3 border-t border-white/5">
                 <p className="text-sm font-semibold text-white mb-1">Automatically Excludes:</p>
@@ -195,9 +197,9 @@ function AutoFlagRules({ onRulesChange }) {
         
         <div className="text-sm text-slate-400 space-y-1">
           <p className="text-xs font-semibold text-white mb-1">Actions:</p>
-          <p>🚩 <strong className="text-white">Flag:</strong> Mark video as "Flagged for Takedown"</p>
-          <p>🟠 <strong className="text-white">High Priority:</strong> Mark as High priority (but not flagged)</p>
-          <p>🔴 <strong className="text-white">Critical:</strong> Mark as Critical + Flag + Send email alert</p>
+          <p><strong className="text-white">Flag:</strong> Mark video as "Flagged for Takedown"</p>
+          <p><strong className="text-white">High Priority:</strong> Mark as High priority (but not flagged)</p>
+          <p><strong className="text-white">Critical:</strong> Mark as Critical + Flag + Send email alert</p>
         </div>
         
         <div className="mt-4 pt-4 border-t border-white/5">

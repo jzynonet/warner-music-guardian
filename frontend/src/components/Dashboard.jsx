@@ -69,11 +69,11 @@ function Dashboard({ apiConfigured }) {
       
       const totalFound = response.data.total_found
       const totalNew = response.data.total_new
-      alert(`✅ Search complete!\n\nTotal videos found: ${totalFound}\nNew videos: ${totalNew}`)
+      alert(`Search complete!\n\nTotal videos found: ${totalFound}\nNew videos: ${totalNew}`)
       
       await loadData()
     } catch (error) {
-      alert(`❌ Search failed:\n\n${error.response?.data?.error || error.message}`)
+      alert(`Search failed:\n\n${error.response?.data?.error || error.message}`)
     } finally {
       setLoading(false)
     }
@@ -114,7 +114,7 @@ function Dashboard({ apiConfigured }) {
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 rounded-lg p-6 border border-blue-800/30">
         <h1 className="text-2xl font-bold text-white mb-2">
-          🎵 YouTube Music Copyright Monitor
+          YouTube Music Copyright Monitor
         </h1>
         <p className="text-gray-400">
           Import artists from Spotify → Search YouTube → Find unauthorized uploads

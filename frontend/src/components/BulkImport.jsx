@@ -74,14 +74,9 @@ Tour Name 2024,Another Artist,true,Critical`
 
   return (
     <div className="glass-panel rounded-xl p-6 border border-white/5">
-      <div className="flex items-center gap-3 mb-8">
-        <div className="p-2 bg-white/5 rounded-lg border border-white/10">
-            <span className="text-xl">📥</span>
-        </div>
-        <h2 className="text-xl font-bold text-white">
-            Bulk Keyword Import
-        </h2>
-      </div>
+      <h2 className="text-lg font-semibold text-white mb-8">
+        Bulk Keyword Import
+      </h2>
 
       <div className="space-y-8">
         {/* Instructions */}
@@ -237,8 +232,8 @@ Tour Name 2024,Another Artist,true,Critical`
 
         {/* Tips */}
         <div className="bg-white/[0.02] border border-white/5 rounded-xl p-6">
-          <h4 className="font-semibold text-slate-300 mb-3 flex items-center gap-2">
-            <span className="text-lg">💡</span> Pro Tips
+          <h4 className="font-semibold text-slate-300 mb-3">
+            Tips
           </h4>
           <ul className="list-disc list-inside space-y-2 text-sm text-slate-500 ml-1">
             <li>You can import 1000+ keywords at once</li>

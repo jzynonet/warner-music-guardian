@@ -1,7 +1,8 @@
 """
 Unified Artist & Song Import Service
-Combines Spotify + MusicBrainz for reliable song fetching.
+Combines Spotify + MusicBrainz + Deezer for reliable song fetching.
 Falls back gracefully when one source fails.
+Now includes Deezer (free, no auth) to bypass Spotify API restrictions.
 """
 
 import time
@@ -12,12 +13,14 @@ class UnifiedImportService:
     """
     Unified import that tries multiple sources:
     1. Spotify (if configured) - better metadata, album grouping
-    2. MusicBrainz (always available) - free, comprehensive, no auth needed
+    2. Deezer (always available, free) - excellent metadata, no auth needed
+    3. MusicBrainz (always available) - free, comprehensive, no auth needed
     """
     
-    def __init__(self, spotify_service=None, musicbrainz_service=None):
+    def __init__(self, spotify_service=None, musicbrainz_service=None, web_scraper_service=None):
         self.spotify = spotify_service
         self.musicbrainz = musicbrainz_service
+        self.web_scraper = web_scraper_service
     
     def search_artist(self, artist_name: str) -> Dict:
         """
@@ -31,6 +34,7 @@ class UnifiedImportService:
             'artist_info': None,
             'source': None,
             'spotify_available': self.spotify is not None and self._test_spotify(),
+            'deezer_available': self.web_scraper is not None,
             'musicbrainz_available': self.musicbrainz is not None
         }
         
@@ -52,6 +56,25 @@ class UnifiedImportService:
                     return result
             except Exception as e:
                 print(f"Spotify artist search failed: {e}")
+        
+        # Try Deezer (free, no auth, great metadata)
+        if self.web_scraper:
+            try:
+                artist = self.web_scraper.search_artist_deezer(artist_name)
+                if artist:
+                    result['found'] = True
+                    result['artist_info'] = {
+                        'name': artist['name'],
+                        'deezer_id': artist['id'],
+                        'image_url': artist.get('picture'),
+                        'followers': artist.get('fans', 0),
+                        'genres': [],
+                        'deezer_link': artist.get('link')
+                    }
+                    result['source'] = 'deezer'
+                    return result
+            except Exception as e:
+                print(f"Deezer artist search failed: {e}")
         
         # Fallback to MusicBrainz
         if self.musicbrainz:
@@ -76,13 +99,14 @@ class UnifiedImportService:
         
         return result
     
-    def get_artist_songs(self, artist_name: str, spotify_url: str = None) -> Dict:
+    def get_artist_songs(self, artist_name: str, spotify_url: str = None, preferred_source: str = None) -> Dict:
         """
         Get all songs for an artist, trying multiple sources.
         
         Args:
             artist_name: Artist name to search for
             spotify_url: Optional Spotify artist URL for direct lookup
+            preferred_source: Optional preferred source ('deezer', 'spotify', 'musicbrainz')
             
         Returns:
             dict with:
@@ -95,6 +119,12 @@ class UnifiedImportService:
         """
         sources_tried = []
         last_error = None
+        
+        # If preferred source is specified, try it first
+        if preferred_source == 'deezer' and artist_name and self.web_scraper:
+            result = self._try_deezer(artist_name, sources_tried)
+            if result:
+                return result
         
         # Strategy 1: Try Spotify with URL (most precise)
         if spotify_url and self.spotify and self._test_spotify():
@@ -128,7 +158,7 @@ class UnifiedImportService:
                 print(f"Spotify URL lookup failed: {e}")
         
         # Strategy 2: Try Spotify with artist name search
-        if artist_name and self.spotify and self._test_spotify():
+        if artist_name and self.spotify and self._test_spotify() and preferred_source != 'deezer':
             sources_tried.append('spotify_search')
             try:
                 result = self.spotify.get_artist_all_songs(artist_name)
@@ -166,7 +196,23 @@ class UnifiedImportService:
                 last_error = str(e)
                 print(f"Spotify search failed: {e}")
         
-        # Strategy 3: MusicBrainz (always available, no auth)
+        # Strategy 3: Deezer (free, no auth, great metadata)
+        if artist_name and self.web_scraper and preferred_source != 'deezer':
+            result = self._try_deezer(artist_name, sources_tried)
+            if result:
+                # If we had Spotify artist info from earlier attempt, merge it
+                if spotify_url and self.spotify:
+                    try:
+                        sp_artist = self.spotify.get_artist_from_url(spotify_url)
+                        if sp_artist:
+                            result['artist_info']['spotify_url'] = sp_artist.get('spotify_url')
+                            if sp_artist.get('genres'):
+                                result['artist_info']['genres'] = sp_artist['genres']
+                    except:
+                        pass
+                return result
+        
+        # Strategy 4: MusicBrainz (always available, no auth)
         if artist_name and self.musicbrainz:
             sources_tried.append('musicbrainz')
             try:
@@ -241,6 +287,31 @@ class UnifiedImportService:
             'sources_tried': sources_tried
         }
     
+    def _try_deezer(self, artist_name: str, sources_tried: list) -> Optional[Dict]:
+        """Try fetching from Deezer. Returns result dict or None."""
+        sources_tried.append('deezer')
+        try:
+            result = self.web_scraper.get_artist_songs_deezer(artist_name)
+            if result.get('success'):
+                main_songs = result.get('main_songs', [])
+                featured_songs = result.get('featured_songs', [])
+                
+                if len(main_songs) > 0 or len(featured_songs) > 0:
+                    return {
+                        'success': True,
+                        'artist_info': result['artist_info'],
+                        'main_songs': main_songs,
+                        'featured_songs': featured_songs,
+                        'albums': result.get('albums', []),
+                        'total_main_songs': len(main_songs),
+                        'total_featured_songs': len(featured_songs),
+                        'source': 'deezer',
+                        'sources_tried': sources_tried
+                    }
+        except Exception as e:
+            print(f"Deezer lookup failed: {e}")
+        return None
+    
     def _test_spotify(self) -> bool:
         """Test if Spotify credentials are valid"""
         try:
@@ -253,6 +324,7 @@ class UnifiedImportService:
 if __name__ == "__main__":
     from spotify_service import SpotifyService
     from musicbrainz_service import MusicBrainzService
+    from web_scraper_service import WebScraperService
     
     # Initialize services
     try:
@@ -263,15 +335,18 @@ if __name__ == "__main__":
         spotify_ok = False
     
     musicbrainz = MusicBrainzService()
+    web_scraper = WebScraperService()
     
     # Create unified service
     importer = UnifiedImportService(
         spotify_service=spotify if spotify_ok else None,
-        musicbrainz_service=musicbrainz
+        musicbrainz_service=musicbrainz,
+        web_scraper_service=web_scraper
     )
     
     print("🔍 Testing Unified Import Service\n")
     print(f"  Spotify: {'✅ Available' if spotify_ok else '❌ Not configured'}")
+    print(f"  Deezer: ✅ Always available (free, no auth)")
     print(f"  MusicBrainz: ✅ Always available\n")
     
     # Test with an artist

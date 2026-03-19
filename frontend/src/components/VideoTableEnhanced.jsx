@@ -196,16 +196,16 @@ function VideoTableEnhanced({ videos, keywords, artists, filters, onFiltersChang
                         <p className="text-xs font-bold text-slate-400 mb-2 px-2 uppercase tracking-wider">Update Priority</p>
                         <div className="space-y-1">
                           <button onClick={() => handleBatchAction('priority', 'Critical')} className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-all">
-                            🔴 Critical
+                            Critical
                           </button>
                           <button onClick={() => handleBatchAction('priority', 'High')} className="w-full text-left px-3 py-2 text-sm text-amber-400 hover:bg-amber-500/10 rounded-lg transition-all">
-                            🟠 High
+                            High
                           </button>
                           <button onClick={() => handleBatchAction('priority', 'Medium')} className="w-full text-left px-3 py-2 text-sm text-neon-blue hover:bg-neon-blue/10 rounded-lg transition-all">
-                            🔵 Medium
+                            Medium
                           </button>
                           <button onClick={() => handleBatchAction('priority', 'Low')} className="w-full text-left px-3 py-2 text-sm text-slate-400 hover:bg-white/5 rounded-lg transition-all">
-                            ⚪ Low
+                            Low
                           </button>
                         </div>
                       </div>
@@ -307,10 +307,10 @@ function VideoTableEnhanced({ videos, keywords, artists, filters, onFiltersChang
               className="block w-full bg-slate-900/50 border border-white/10 rounded-xl text-sm text-slate-200 focus:ring-2 focus:ring-neon-blue/50 focus:border-neon-blue/50 backdrop-blur-sm"
             >
               <option value="">All priorities</option>
-              <option value="Critical">🔴 Critical</option>
-              <option value="High">🟠 High</option>
-              <option value="Medium">🟡 Medium</option>
-              <option value="Low">🟢 Low</option>
+              <option value="Critical">Critical</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
             </select>
           </div>
 
@@ -334,7 +334,9 @@ function VideoTableEnhanced({ videos, keywords, artists, filters, onFiltersChang
       <div className="overflow-x-auto">
         {videos.length === 0 ? (
           <div className="text-center py-20 text-slate-500">
-            <div className="mb-4 text-4xl opacity-20">🔍</div>
+            <svg className="w-10 h-10 mx-auto mb-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
             <p className="text-lg font-medium">No videos found</p>
             <p className="text-sm opacity-60 mt-1">Adjust filters or run a search to get started.</p>
           </div>
@@ -409,7 +411,7 @@ function VideoTableEnhanced({ videos, keywords, artists, filters, onFiltersChang
                               className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold bg-neon-yellow/10 text-neon-yellow rounded border border-neon-yellow/20 shadow-neon-yellow"
                               title={video.ai_reason || 'Automatically detected by AI'}
                             >
-                              🤖 AI Flagged
+                              AI Flagged
                               {video.ai_risk_score > 0 && (
                                 <span className="opacity-75 ml-1 border-l border-neon-yellow/30 pl-1">
                                   {video.ai_risk_score}
@@ -426,7 +428,7 @@ function VideoTableEnhanced({ videos, keywords, artists, filters, onFiltersChang
                               }`}
                               title={video.ai_reason || `AI Risk: ${video.ai_risk_level}`}
                             >
-                              ⚠️ Risk: {video.ai_risk_level} ({video.ai_risk_score})
+                              Risk: {video.ai_risk_level} ({video.ai_risk_score})
                             </span>
                           )}
                         </div>
@@ -467,10 +469,10 @@ function VideoTableEnhanced({ videos, keywords, artists, filters, onFiltersChang
                       onChange={(e) => handlePriorityChange(video.id, e.target.value)}
                       className={`text-xs font-bold rounded-lg border border-transparent focus:ring-2 focus:ring-neon-blue/50 px-2.5 py-1.5 transition-all ${getPriorityColor(video.priority)}`}
                     >
-                      <option value="Critical">🔴 Critical</option>
-                      <option value="High">🟠 High</option>
-                      <option value="Medium">🔵 Medium</option>
-                      <option value="Low">⚪ Low</option>
+                      <option value="Critical">Critical</option>
+                      <option value="High">High</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Low">Low</option>
                     </select>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

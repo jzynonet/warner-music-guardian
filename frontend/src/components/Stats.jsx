@@ -74,17 +74,12 @@ function Stats({ stats, onFilterClick, activeFilter }) {
         {/* AI Stats */}
         {stats.auto_flagged !== undefined && (
           <div className="glass-panel p-4 rounded-xl border border-white/5 flex items-center justify-between">
-             <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-lg">
-                  🤖
+             <div>
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">AI Detection</div>
+                <div className="text-sm text-slate-300 mt-0.5">
+                  <span className="text-white font-bold">{stats.auto_flagged}</span> videos flagged automatically
                 </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">AI Detection</div>
-                  <div className="text-sm text-slate-300">
-                    <span className="text-white font-bold">{stats.auto_flagged}</span> videos flagged automatically
-                  </div>
-                </div>
-             </div>
+              </div>
              <div className="text-right">
                <div className="text-2xl font-bold text-white">
                  {stats.total_videos > 0 ? Math.round((stats.auto_flagged / stats.total_videos) * 100) : 0}%

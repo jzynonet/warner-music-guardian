@@ -15,15 +15,9 @@ function SearchControl({ songs, onSearch, loading, apiConfigured }) {
   const activeSongs = songs.filter(s => s.active)
 
   return (
-    <div className="glass-card rounded-2xl p-6 relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-32 h-32 bg-neon-blue/5 rounded-full blur-3xl -mr-16 -mt-16"></div>
-      <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-3 relative z-10">
-        <div className="p-2 bg-neon-blue/10 rounded-lg border border-neon-blue/20 shadow-neon-blue">
-            <svg className="w-5 h-5 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-        </div>
-        <span className="tracking-wide">Search YouTube</span>
+    <div className="glass-card rounded-2xl p-6">
+      <h2 className="text-sm font-semibold text-white mb-5">
+        Search YouTube
       </h2>
       
       <div className="space-y-6 relative z-10">
