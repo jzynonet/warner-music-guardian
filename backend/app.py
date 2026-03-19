@@ -37,14 +37,18 @@ allowed_origins = [
 # Add production frontend URL from environment variable
 frontend_url = os.getenv('FRONTEND_URL')
 if frontend_url:
-    allowed_origins.append(frontend_url)
+    # Add the URL as-is
+    allowed_origins.append(frontend_url.rstrip('/'))
     # Also add https version if http is provided
     if frontend_url.startswith('http://'):
-        allowed_origins.append(frontend_url.replace('http://', 'https://'))
+        allowed_origins.append(frontend_url.replace('http://', 'https://').rstrip('/'))
     # Also add http version if https is provided
     elif frontend_url.startswith('https://'):
-        allowed_origins.append(frontend_url.replace('https://', 'http://'))
+        allowed_origins.append(frontend_url.replace('https://', 'http://').rstrip('/'))
 
+print(f"CORS Allowed Origins: {allowed_origins}")
+
+# Use Flask-CORS as baseline
 CORS(app, resources={
     r"/api/*": {
         "origins": allowed_origins,
@@ -53,6 +57,33 @@ CORS(app, resources={
         "supports_credentials": True
     }
 })
+
+# Manual CORS handler to guarantee OPTIONS preflight works
+# (Flask-CORS sometimes fails to handle OPTIONS, returning 404)
+@app.after_request
+def after_request(response):
+    origin = request.headers.get('Origin', '')
+    if origin in allowed_origins or not origin:
+        response.headers['Access-Control-Allow-Origin'] = origin if origin else '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Max-Age'] = '3600'
+    return response
+
+@app.before_request
+def handle_preflight():
+    """Explicitly handle OPTIONS preflight requests so they never 404"""
+    if request.method == 'OPTIONS':
+        origin = request.headers.get('Origin', '')
+        if origin in allowed_origins or not origin:
+            response = app.make_default_options_response()
+            response.headers['Access-Control-Allow-Origin'] = origin if origin else '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            response.headers['Access-Control-Max-Age'] = '3600'
+            return response
 
 # Initialize database
 db = Database(os.getenv('DATABASE_PATH', 'videos.db'))
